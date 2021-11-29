@@ -8,6 +8,8 @@ from itertools import compress
 # Used for writing the .bed file
 import csv
 
+from click.core import F
+
 
 from Bio import SeqIO
 from Bio.Align.Applications import ClustalOmegaCommandline
@@ -16,11 +18,6 @@ from Bio.Align import AlignInfo
 from Bio.Seq import Seq
 from Bio.Seq import MutableSeq
 from Bio.SeqRecord import SeqRecord
-
-
-# clustalomega_cline = ClustalOmegaCommandline(infile=in_file, outfile=out_file, verbose=True, percentid=True, distmat_out=in_file + '.dist', distmat_full=True, threads=4)
-# print clustalomega_cline
-# clustalomega_cline()
 
 
 def check_or_create_outpath(path, force: bool = False):
@@ -36,6 +33,10 @@ def check_or_create_outpath(path, force: bool = False):
 
 
 def consen_gen(aligned_path, fasta_seq_name):
+    """
+    This takes the path to an aligned file and the name you want the consensus sequence to call called.
+    Returns a SeqRecoord containg the consensus sequence
+    """
     align = AlignIO.read(aligned_path, "fasta")
     summary_align = AlignInfo.SummaryInfo(align)
     consensus = summary_align.gap_consensus(threshold=0.5, ambiguous="N")
@@ -44,7 +45,60 @@ def consen_gen(aligned_path, fasta_seq_name):
     return consensus_seq_r
 
 
+def consen_gen2(aligned_path, fasta_seq_name, threshold=2 / 3):
+
+    align = AlignIO.read(aligned_path, "fasta")
+
+    cat_seq = str()
+    for seqrecord in align:
+        cat_seq += str(seqrecord.seq)
+
+    unique_bases = set(cat_seq)
+    returned_base = [""] * align.get_alignment_length()
+    for pos in range(align.get_alignment_length()):
+        slice = ""
+        for i in range(len(align)):
+            slice += align[i][pos]
+
+        consen_dict = {}
+        for base in unique_bases:
+            consen_dict[base] = slice.count(base)
+
+        # TODO add the logic here to select the required base from the dict for each position
+        # Removes bases that confuse the analysis
+        consen_dict.pop("N", None)
+        consen_dict.pop("-", None)
+
+        count_of_returned_base = max(consen_dict.values())
+        max_base = {s for s in consen_dict if consen_dict[s] == count_of_returned_base}
+        number_valid_base = sum(consen_dict.values())
+
+        if number_valid_base == 0:
+            returned_base[pos] = "N"
+            # If there are no valid bases, then this slice must only contain "N" or "-".
+        elif len(max_base) == 1:
+            returned_base[pos] = list(max_base)[0]
+            # If there is only one key, which has the highest value. Then it is assigned to the position
+        elif len(max_base) != 1:
+            returned_base[pos] = "N"
+            # If two valid bases both have the same ocourance. Then an "N" is asigned
+
+            # If the assigned base doesn't meet the threshold. Then it is replaced with an "N"
+        if (
+            0 != number_valid_base
+            and count_of_returned_base / number_valid_base < threshold
+        ):
+            returned_base[pos] = "N"
+    # The list is joined into a string
+    seq = SeqRecord(Seq("".join(returned_base)), id=fasta_seq_name, description="")
+    return seq
+
+
 def continous_func(x):
+    """
+    This take a list of intergers, and group them into continous runs.
+    Returns a dictionry that contains the interger (key) and the group (value)
+    """
     group = 0
     group_list = [""] * len(x)
     for insert_positions in range(len(x)):
@@ -139,7 +193,7 @@ def main(input, ref_genome, output=None, cores=None):
             msa = clustalomega_cline()
 
         # This creates an aligned object, and then a consensus sequence
-        pseudo_consensus = consen_gen(
+        pseudo_consensus = consen_gen2(
             output_pango_dir_tmp
             / pathlib.Path(
                 pango_lin + "_pseudo_msa.fasta",
@@ -147,6 +201,7 @@ def main(input, ref_genome, output=None, cores=None):
             ),
             fasta_seq_name=pango_lin + "_pseudo_consensus",
         )
+
         # Saves the consensus sequence as a .fasta
         consen_file = pango_lin + "_pseudo_consensus.fasta"
         SeqIO.write(
@@ -262,7 +317,7 @@ def main(input, ref_genome, output=None, cores=None):
             "fasta",
         )
 
-        # Generates a .bed file
+        # Generates a .bed file, which contains all the changes between
         total_row_list = [""] * len(mutable_seq)
         diff_base_index = [""] * len(mutable_seq)
 
