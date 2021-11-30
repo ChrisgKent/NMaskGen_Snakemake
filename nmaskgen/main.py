@@ -10,6 +10,11 @@ import csv
 
 from click.core import F
 
+# Imports consen_gen2()
+from nmaskgen.consensus_gen import *
+
+# Imports repair() and continous_func()
+from nmaskgen.repair import *
 
 from Bio import SeqIO
 from Bio.Align.Applications import ClustalOmegaCommandline
@@ -43,76 +48,6 @@ def consen_gen(aligned_path, fasta_seq_name):
 
     consensus_seq_r = SeqRecord(Seq(consensus), id=fasta_seq_name, description="")
     return consensus_seq_r
-
-
-def consen_gen2(aligned_path, fasta_seq_name, threshold=2 / 3):
-    """ "
-    This takes the path to an aligned file and the name you want the consensus sequence to call called.
-    Returns a SeqRecord containg the consensus sequence
-
-    This is differance from consen_gen. As this applies logic to which base is returned in a few ways
-
-    Seq1:               ATGC--
-    Seq2:               ATCC--
-    Seq3:               N-----
-    Seq4:               N-----
-
-    classic_consen:     N-----
-    this_consen:        ATNCNN
-
-
-    A simple consen_gen would have returned "N---" as "-" is the most common base in each position.
-        Expect for the first position where the equal number would trigger an ambiquity char
-
-    This consen discards the gaps (or "N"), enabling genomes with poly N track to be used.
-        It can also detect vairability within the valid bases
-        If no valid bases are detected it will return "N"
-
-    """
-    align = AlignIO.read(aligned_path, "fasta")
-
-    cat_seq = str()
-    for seqrecord in align:
-        cat_seq += str(seqrecord.seq)
-
-    unique_bases = set(cat_seq)
-    returned_base = [""] * align.get_alignment_length()
-    for pos in range(align.get_alignment_length()):
-        slice = ""
-        for i in range(len(align)):
-            slice += align[i][pos]
-
-        consen_dict = {}
-        for base in unique_bases:
-            consen_dict[base] = slice.count(base)
-
-        # Removes bases that confuse the analysis
-        consen_dict.pop("N", None)
-        consen_dict.pop("-", None)
-
-        count_of_returned_base = max(consen_dict.values())
-        max_base = {s for s in consen_dict if consen_dict[s] == count_of_returned_base}
-        number_valid_base = sum(consen_dict.values())
-
-        if number_valid_base == 0:
-            returned_base[pos] = "N"
-            # If there are no valid bases, then this slice must only contain "N" or "-".
-        elif len(max_base) == 1:
-            returned_base[pos] = list(max_base)[0]
-            # If there is only one key, which has the highest value. Then it is assigned to the position
-        elif len(max_base) != 1:
-            returned_base[pos] = "N"
-            # If two valid bases both have the same ocourance. Then an "N" is asigned
-
-            # If the assigned base doesn't meet the threshold. Then it is replaced with an "N"
-        if (
-            0 != number_valid_base
-            and count_of_returned_base / number_valid_base < threshold
-        ):
-            returned_base[pos] = "N"
-    # The list is joined into a string
-    seq = SeqRecord(Seq("".join(returned_base)), id=fasta_seq_name, description="")
-    return seq
 
 
 def continous_func(x):
@@ -166,6 +101,9 @@ def continous_func(x):
 )
 def main(input, ref_genome, output=None, cores=None):
     check_or_create_outpath(output, force=True)
+
+    # Creates a dict containing .bed file locations
+    bed_file_dict = {}
 
     # Reads in the referance sequence
     ref_fasta = SeqIO.parse(ref_genome, "fasta")
@@ -255,87 +193,46 @@ def main(input, ref_genome, output=None, cores=None):
             )
             msa = clustalomega_cline()
 
-        ############################################################
-        ## Starts to repair the left/right ends of the pre_repair ##
-        ############################################################
-
-        repair_test = AlignIO.read(pre_repair_consen_file, format="fasta")
-
-        mutable_seq = MutableSeq(repair_test[0].seq)
-
-        # Starting from 0 this iterates through, and if the sequences are differant it replaces with bases from the ref
-        ## repair-test[1] is the ref seq
-        for pos in range(repair_test.get_alignment_length()):
-            agreement = set(repair_test[:, pos])
-            if len(agreement) != 2:
-                break
-            mutable_seq[pos] = repair_test[1][pos]
-        # Starts from the right.
-        for pos in range(repair_test.get_alignment_length())[::-1]:
-            agreement = set(repair_test[:, pos])
-            if len(agreement) != 2:
-                break
-            mutable_seq[pos] = repair_test[1][pos]
-
-        # Detects delections within the psudeogenome
-        del_indexes = [i for i, j in enumerate(mutable_seq) if j == "-"]
-        for i in del_indexes:
-            mutable_seq[i] = "N"
-
-        # Detects insertions into the pseudogenome
-        # If there has been an insertion into the ref genome
-        if repair_test[1].seq.count("-") > 0:
-            print(pango_lin, "has insert")
-
-            # This contains the indexes of all locations of "-" in the aligned ref genome
-            indexes = [i for i, j in enumerate(repair_test[1].seq) if j == "-"]
-            # This function return if the insertions are adjasent. "indexes" key is the index, the value is the group
-            indexes = continous_func(indexes)
-
-            # Solves each group
-            for insert_group in set(indexes.values()):
-
-                # Finds all indexes that belong to the group "insert_group"
-                for_index = [x == insert_group for x in list(indexes.values())]
-                values = list(compress(list(indexes.keys()), for_index))
-
-                # Replaces all of the bases the deleted with an *
-                for i in values:
-                    mutable_seq[i] = "*"
-
-                # Replaces the base -1 with an "N"
-                mutable_seq[min(values) - 1] = "N"
-
-            # Once all the bases have been marked, they can then be deleted without messing up the index system
-            for i in range(mutable_seq.count("*")):
-                mutable_seq.remove("*")
+        repaired_genome = repair(pre_repair_consen_file, pango_lin=pango_lin)
 
         SeqIO.write(
-            SeqRecord(mutable_seq, id=pango_lin + "_pseudoref", description=""),
+            SeqRecord(repaired_genome, id=pango_lin + "_pseudoref", description=""),
             output_pango_dir / pathlib.Path(pango_lin + "_pseudoref.fasta"),
             "fasta",
         )
 
         # Generates a .bed file, which contains all the changes between the p
-        total_row_list = [""] * len(mutable_seq)
-        diff_base_index = [""] * len(mutable_seq)
+        total_row_list = [""] * len(repaired_genome)
+        diff_base_index = [""] * len(repaired_genome)
 
-        for i in range(len(mutable_seq)):
+        for i in range(len(repaired_genome)):
             total_row_list[i] = [
                 ref_name,
                 i,
                 i + 1,
-                ref_sequence[i] + "to" + mutable_seq[i],
+                ref_sequence[i] + "to" + repaired_genome[i],
             ]
-            diff_base_index[i] = ref_sequence[i] != mutable_seq[i]
+            diff_base_index[i] = ref_sequence[i] != repaired_genome[i]
 
         # Differant base?
         diff_bases = list(compress(total_row_list, diff_base_index))
         bed_dir = output_pango_dir / pathlib.Path(pango_lin + "_pseudoref.bed")
-        with open(bed_dir, "w", newline="") as file:
+
+        with open(bed_dir, mode="w", newline="") as file:
             writer = csv.writer(file, delimiter="\t")
             writer.writerows(diff_bases)
 
+        bed_file_dict[pango_lin] = bed_dir
+
+    # Combines the .bed files and uses the referance genome to create a de novo NMasked fasta
+
+    for file_dir in bed_file_dict.keys():
+        with open(bed_file_dict[file_dir], mode="r") as file:
+            bedfile = csv.reader(file, delimiter="\t")
+
+            for lines in bedfile:
+                print(lines[1])
+
 
 if __name__ == "__main__":
-    pass
+    main()
