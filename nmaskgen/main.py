@@ -35,7 +35,7 @@ def check_or_create_outpath(path, force: bool = False):
 def consen_gen(aligned_path, fasta_seq_name):
     """
     This takes the path to an aligned file and the name you want the consensus sequence to call called.
-    Returns a SeqRecoord containg the consensus sequence
+    Returns a SeqRecord containg the consensus sequence
     """
     align = AlignIO.read(aligned_path, "fasta")
     summary_align = AlignInfo.SummaryInfo(align)
@@ -46,7 +46,29 @@ def consen_gen(aligned_path, fasta_seq_name):
 
 
 def consen_gen2(aligned_path, fasta_seq_name, threshold=2 / 3):
+    """ "
+    This takes the path to an aligned file and the name you want the consensus sequence to call called.
+    Returns a SeqRecord containg the consensus sequence
 
+    This is differance from consen_gen. As this applies logic to which base is returned in a few ways
+
+    Seq1:               ATGC--
+    Seq2:               ATCC--
+    Seq3:               N-----
+    Seq4:               N-----
+
+    classic_consen:     N-----
+    this_consen:        ATNCNN
+
+
+    A simple consen_gen would have returned "N---" as "-" is the most common base in each position.
+        Expect for the first position where the equal number would trigger an ambiquity char
+
+    This consen discards the gaps (or "N"), enabling genomes with poly N track to be used.
+        It can also detect vairability within the valid bases
+        If no valid bases are detected it will return "N"
+
+    """
     align = AlignIO.read(aligned_path, "fasta")
 
     cat_seq = str()
@@ -64,7 +86,6 @@ def consen_gen2(aligned_path, fasta_seq_name, threshold=2 / 3):
         for base in unique_bases:
             consen_dict[base] = slice.count(base)
 
-        # TODO add the logic here to select the required base from the dict for each position
         # Removes bases that confuse the analysis
         consen_dict.pop("N", None)
         consen_dict.pop("-", None)
@@ -202,14 +223,6 @@ def main(input, ref_genome, output=None, cores=None):
             fasta_seq_name=pango_lin + "_pseudo_consensus",
         )
 
-        # Saves the consensus sequence as a .fasta
-        consen_file = pango_lin + "_pseudo_consensus.fasta"
-        SeqIO.write(
-            pseudo_consensus,
-            pathlib.Path(output_pango_dir / consen_file),
-            "fasta",
-        )
-
         # Combines the consensus and the ref. Writes to tmp
         for seq_record in ref_fasta:
             ref_sequence = seq_record.seq
@@ -232,7 +245,7 @@ def main(input, ref_genome, output=None, cores=None):
                 "exists",
             )
         else:
-            # Aligns the psuedo genome and the ref sequence
+            # Aligns the pseudo genome and the ref sequence
             clustalomega_cline = ClustalOmegaCommandline(
                 infile=pathlib.Path(output_pango_dir_tmp / seq_ref_file),
                 outfile=pre_repair_consen_file,
@@ -241,20 +254,6 @@ def main(input, ref_genome, output=None, cores=None):
                 threads=cores,
             )
             msa = clustalomega_cline()
-
-        # Generates a consensus sequence
-        repair_consensus = consen_gen(
-            pre_repair_consen_file,
-            fasta_seq_name=pango_lin + "_prerepair_consensus",
-        )
-
-        # Saves the consensus repair_consensus as a .fasta
-        repair_consensus_file = pango_lin + "_prerepair_consensus.fasta"
-        SeqIO.write(
-            repair_consensus,
-            pathlib.Path(output_pango_dir / repair_consensus_file),
-            "fasta",
-        )
 
         ############################################################
         ## Starts to repair the left/right ends of the pre_repair ##
@@ -312,12 +311,12 @@ def main(input, ref_genome, output=None, cores=None):
                 mutable_seq.remove("*")
 
         SeqIO.write(
-            SeqRecord(mutable_seq, id=pango_lin + "_psuedoref.fasta", description=""),
-            output_pango_dir / pathlib.Path(pango_lin + "_psuedoref.fasta"),
+            SeqRecord(mutable_seq, id=pango_lin + "_pseudoref", description=""),
+            output_pango_dir / pathlib.Path(pango_lin + "_pseudoref.fasta"),
             "fasta",
         )
 
-        # Generates a .bed file, which contains all the changes between
+        # Generates a .bed file, which contains all the changes between the p
         total_row_list = [""] * len(mutable_seq)
         diff_base_index = [""] * len(mutable_seq)
 
@@ -332,7 +331,7 @@ def main(input, ref_genome, output=None, cores=None):
 
         # Differant base?
         diff_bases = list(compress(total_row_list, diff_base_index))
-        bed_dir = output_pango_dir / pathlib.Path(pango_lin + "_psuedoref.bed")
+        bed_dir = output_pango_dir / pathlib.Path(pango_lin + "_pseudoref.bed")
         with open(bed_dir, "w", newline="") as file:
             writer = csv.writer(file, delimiter="\t")
             writer.writerows(diff_bases)
