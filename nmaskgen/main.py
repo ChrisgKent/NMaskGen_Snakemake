@@ -2,9 +2,6 @@ import click
 import pathlib
 import multiprocessing
 
-# Used in the insert loop
-from itertools import compress
-
 # Used for writing the .bed file
 import csv
 
@@ -12,14 +9,17 @@ from click.core import F
 
 # Imports consen_gen2()
 from nmaskgen.consensus_gen import *
+from nmaskgen.mask_gen import mask_gen
 
 # Imports repair() and continous_func()
 from nmaskgen.repair import *
 
+# Imports bed_concat
+from nmaskgen.bed_file_concatinator import *
+
+
 from Bio import SeqIO
 from Bio.Align.Applications import ClustalOmegaCommandline
-from Bio import AlignIO
-from Bio.Align import AlignInfo
 from Bio.Seq import Seq
 from Bio.Seq import MutableSeq
 from Bio.SeqRecord import SeqRecord
@@ -35,36 +35,6 @@ def check_or_create_outpath(path, force: bool = False):
 
     path.mkdir(exist_ok=True)
     return path
-
-
-def consen_gen(aligned_path, fasta_seq_name):
-    """
-    This takes the path to an aligned file and the name you want the consensus sequence to call called.
-    Returns a SeqRecord containg the consensus sequence
-    """
-    align = AlignIO.read(aligned_path, "fasta")
-    summary_align = AlignInfo.SummaryInfo(align)
-    consensus = summary_align.gap_consensus(threshold=0.5, ambiguous="N")
-
-    consensus_seq_r = SeqRecord(Seq(consensus), id=fasta_seq_name, description="")
-    return consensus_seq_r
-
-
-def continous_func(x):
-    """
-    This take a list of intergers, and group them into continous runs.
-    Returns a dictionry that contains the interger (key) and the group (value)
-    """
-    group = 0
-    group_list = [""] * len(x)
-    for insert_positions in range(len(x)):
-        if insert_positions == 0:
-            group_list[insert_positions] = group
-        elif x[insert_positions] - x[insert_positions - 1] == 1:
-            group_list[insert_positions] = group
-        else:
-            group += 1
-    return dict(zip(x, group_list))
 
 
 @click.command()
@@ -104,6 +74,7 @@ def main(input, ref_genome, output=None, cores=None):
 
     # Creates a dict containing .bed file locations
     bed_file_dict = {}
+    pseudo_ref_dict = {}
 
     # Reads in the referance sequence
     ref_fasta = SeqIO.parse(ref_genome, "fasta")
@@ -156,7 +127,6 @@ def main(input, ref_genome, output=None, cores=None):
             output_pango_dir_tmp
             / pathlib.Path(
                 pango_lin + "_pseudo_msa.fasta",
-                fasta_seq_name=pango_lin + "_pseudo_consensus",
             ),
             fasta_seq_name=pango_lin + "_pseudo_consensus",
         )
@@ -201,6 +171,10 @@ def main(input, ref_genome, output=None, cores=None):
             "fasta",
         )
 
+        pseudo_ref_dict[pango_lin] = output_pango_dir / pathlib.Path(
+            pango_lin + "_pseudoref.fasta"
+        )
+
         # Generates a .bed file, which contains all the changes between the p
         total_row_list = [""] * len(repaired_genome)
         diff_base_index = [""] * len(repaired_genome)
@@ -224,15 +198,51 @@ def main(input, ref_genome, output=None, cores=None):
 
         bed_file_dict[pango_lin] = bed_dir
 
-    # Combines the .bed files and uses the referance genome to create a de novo NMasked fasta
+    concat_bed = bed_concat(bed_file_dict, output=output)
 
-    for file_dir in bed_file_dict.keys():
-        with open(bed_file_dict[file_dir], mode="r") as file:
-            bedfile = csv.reader(file, delimiter="\t")
+    pseudo_ref_dict[ref_name] = ref_genome
 
-            for lines in bedfile:
-                print(lines[1])
+    changes = [""] * (len(concat_bed))
+
+    psudo_test = [""] * len(pseudo_ref_dict)
+    i = 0
+    for lin in pseudo_ref_dict.keys():
+        x = SeqIO.parse(pseudo_ref_dict[lin], format="fasta")
+        for seqr in x:
+            psudo_test[i] = seqr
+
+        i += 1
+
+    for i in range(len(concat_bed)):
+        combined_bases = ""
+        for seq in psudo_test:
+            combined_bases += seq.seq[concat_bed[i]]
+
+        changes[i] = combined_bases
+
+    # Defining the headings
+    y = [x.id for x in psudo_test]
+    y = ["Position"] + y
+
+    # Defining the rows
+    x = [list(x) for x in changes]
+    for i in range(len(concat_bed)):
+        x[i] = [concat_bed[i]] + x[i]
+
+    with open(output / pathlib.Path("base_changes.tsv"), mode="w", newline="") as file:
+        writer = csv.writer(file, delimiter="\t")
+        writer.writerows([y] + x)
+
+    # Generate an NMasked_fasta
+    mask = mask_gen(concat_bed, ref_sequence)
+
+    SeqIO.write(
+        SeqRecord(mask, id="Nmask", description=""),
+        output / pathlib.Path("NMask.fasta"),
+        "fasta",
+    )
 
 
 if __name__ == "__main__":
+
     main()
