@@ -15,7 +15,7 @@ def consen_gen2(aligned_path, fasta_seq_name, threshold=2 / 3):
 
     This is differance from consen_gen. As this applies logic to which base is returned in a few ways
 
-    Seq1:               ATGC--
+    Seq1:               ATGCA-
     Seq2:               ATCC--
     Seq3:               N-----
     Seq4:               N-----
@@ -30,6 +30,8 @@ def consen_gen2(aligned_path, fasta_seq_name, threshold=2 / 3):
     This consen discards the gaps (or "N"), enabling genomes with poly N track to be used.
         It can also detect vairability within the valid bases
         If no valid bases are detected it will return "N"
+
+    However it does require, two sequences to generate a base. To prevent point mutations being represented
 
     """
     align = AlignIO.read(aligned_path, "fasta")
@@ -55,11 +57,15 @@ def consen_gen2(aligned_path, fasta_seq_name, threshold=2 / 3):
 
         count_of_returned_base = max(consen_dict.values())
         max_base = {s for s in consen_dict if consen_dict[s] == count_of_returned_base}
+        number_max_base = consen_dict[list(max_base)[0]]
+
         number_valid_base = sum(consen_dict.values())
 
         if number_valid_base == 0:
             returned_base[pos] = "N"
             # If there are no valid bases, then this slice must only contain "N" or "-".
+        elif len(max_base) == 1 and number_max_base == 1:
+            returned_base[pos] = "N"
         elif len(max_base) == 1:
             returned_base[pos] = list(max_base)[0]
             # If there is only one key, which has the highest value. Then it is assigned to the position
