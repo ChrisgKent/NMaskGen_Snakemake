@@ -9,6 +9,7 @@ python = "^3.8"
 click = "^8.0.3"
 black = "^21.11b1"
 biopython = "^1.79"
+progress = "^1.6"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
