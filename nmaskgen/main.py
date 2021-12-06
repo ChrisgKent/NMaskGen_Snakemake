@@ -17,7 +17,6 @@ from nmaskgen.repair import *
 # Imports bed_concat
 from nmaskgen.bed_file_concatinator import *
 
-
 from Bio import SeqIO
 from Bio.Align.Applications import ClustalOmegaCommandline
 from Bio.Seq import Seq
@@ -112,6 +111,7 @@ def main(input, ref_genome, output=None, cores=None):
         if msa_path.is_file():
             print(msa_path, "exists")
         else:
+            print("Running clustalomega on ", pango_lin)
             clustalomega_cline = ClustalOmegaCommandline(
                 infile=output_pango_dir / pathlib.Path(pango_lin + "_genomes.fasta"),
                 outfile=output_pango_dir_tmp
@@ -198,12 +198,12 @@ def main(input, ref_genome, output=None, cores=None):
 
         bed_file_dict[pango_lin] = bed_dir
 
+    # Combined all the bed files for each differance linerage
     concat_bed = bed_concat(bed_file_dict, output=output)
 
+    # Adds the referance genome to the base change file
     pseudo_ref_dict[ref_name] = ref_genome
-
     changes = [""] * (len(concat_bed))
-
     psudo_test = [""] * len(pseudo_ref_dict)
     i = 0
     for lin in pseudo_ref_dict.keys():
@@ -212,7 +212,6 @@ def main(input, ref_genome, output=None, cores=None):
             psudo_test[i] = seqr
 
         i += 1
-
     for i in range(len(concat_bed)):
         combined_bases = ""
         for seq in psudo_test:
@@ -220,7 +219,7 @@ def main(input, ref_genome, output=None, cores=None):
 
         changes[i] = combined_bases
 
-    # Defining the headings
+    # Defining the headings for the base change file
     y = [x.id for x in psudo_test]
     y = ["Position"] + y
 
@@ -229,6 +228,7 @@ def main(input, ref_genome, output=None, cores=None):
     for i in range(len(concat_bed)):
         x[i] = [concat_bed[i]] + x[i]
 
+    # Saves the base change file as tsv
     with open(output / pathlib.Path("base_changes.tsv"), mode="w", newline="") as file:
         writer = csv.writer(file, delimiter="\t")
         writer.writerows([y] + x)
