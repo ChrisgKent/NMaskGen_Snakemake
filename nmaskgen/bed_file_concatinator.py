@@ -35,4 +35,4 @@ def bed_concat(bed_dict, output):
         writer = csv.writer(file, delimiter="\t")
         writer.writerows(bed_file)
 
-    return(mutates_pos_list)
+    return mutates_pos_list

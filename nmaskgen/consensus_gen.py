@@ -8,7 +8,7 @@ from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 
 
-def consen_gen2(aligned_path, fasta_seq_name, threshold=2 / 3):
+def consen_gen2(aligned_path, fasta_seq_name, threshold=0.6):
     """ "
     This takes the path to an aligned file and the name you want the consensus sequence to call called.
     Returns a SeqRecord containg the consensus sequence
@@ -40,18 +40,22 @@ def consen_gen2(aligned_path, fasta_seq_name, threshold=2 / 3):
     for seqrecord in align:
         cat_seq += str(seqrecord.seq)
 
+    # Finds all the bases contained within the alignments
     unique_bases = set(cat_seq)
     returned_base = [""] * align.get_alignment_length()
+    # For each base position, it takes a slice
     for pos in range(align.get_alignment_length()):
         slice = ""
         for i in range(len(align)):
             slice += align[i][pos]
 
         consen_dict = {}
+        # Counts now many times each base apears in each positional slice.
+        # Saves results in a dict. With base as key and count as value
         for base in unique_bases:
             consen_dict[base] = slice.count(base)
 
-        # Removes bases that confuse the analysis
+        # Removes bases that confuse the analysis. However these are consideered later
         consen_dict.pop("N", None)
         consen_dict.pop("-", None)
 

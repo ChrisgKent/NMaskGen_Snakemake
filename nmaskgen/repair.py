@@ -18,6 +18,7 @@ def continous_func(x):
             group_list[insert_positions] = group
         else:
             group += 1
+            group_list[insert_positions] = group
     return dict(zip(x, group_list))
 
 
@@ -49,8 +50,6 @@ def repair(aligned_psuedo_path, pango_lin):
     # Detects insertions into the pseudogenome
     # If there has been an insertion into the ref genome
     if repair_test[1].seq.count("-") > 0:
-        print(pango_lin, "has insert")
-
         # This contains the indexes of all locations of "-" in the aligned ref genome
         indexes = [i for i, j in enumerate(repair_test[1].seq) if j == "-"]
         # This function return if the insertions are adjasent. "indexes" key is the index, the value is the group
