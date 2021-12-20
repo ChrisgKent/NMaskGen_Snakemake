@@ -73,7 +73,7 @@ def check_or_create_outpath(path, force: bool = False):
 @click.option(
     "--consen_thresh",
     type=click.FloatRange(min=0.5, max=1),
-    default=0.6,
+    default=0.7,
 )
 @click.option(
     "--advoid_ref_in_nmask",
@@ -227,7 +227,21 @@ def main(
 
     # Generate the no ref nmask
     if advoid_ref_in_nmask != "False":
-        mask = no_ref_mask(pseudo_ref_dict, path=output / pathlib.Path("tmp.fasta"))
+        pseudo_list = [""] * len(pseudo_ref_dict)
+
+        for i in range(len(list(pseudo_ref_dict))):
+            seq = SeqIO.parse(pseudo_ref_dict[list(pseudo_ref_dict)[i]], "fasta")
+
+            pseudo_list[i] = [x for x in seq][0]
+
+        SeqIO.write(pseudo_list, output / pathlib.Path("tmp.fasta"), format="fasta")
+
+        mask = consen_gen2(
+            aligned_path=output / pathlib.Path("tmp.fasta"),
+            fasta_seq_name="NMASK_no_ref",
+            threshold=0.8,
+            ignore_n=False,
+        )
 
         SeqIO.write(
             mask,
