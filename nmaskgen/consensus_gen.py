@@ -8,8 +8,8 @@ from Bio import SeqIO
 from Bio.SeqRecord import SeqRecord
 
 
-def consen_gen2(aligned_path, fasta_seq_name, threshold=0.6):
-    """ "
+def consen_gen2(aligned_path, fasta_seq_name, threshold=0.7, ignore_n=True):
+    """
     This takes the path to an aligned file and the name you want the consensus sequence to call called.
     Returns a SeqRecord containg the consensus sequence
 
@@ -56,8 +56,8 @@ def consen_gen2(aligned_path, fasta_seq_name, threshold=0.6):
             consen_dict[base] = slice.count(base)
 
         # Removes bases that confuse the analysis. However these are consideered later
-        consen_dict.pop("N", None)
-        consen_dict.pop("-", None)
+        if ignore_n:
+            consen_dict.pop("N", None)
 
         count_of_returned_base = max(consen_dict.values())
         max_base = {s for s in consen_dict if consen_dict[s] == count_of_returned_base}
