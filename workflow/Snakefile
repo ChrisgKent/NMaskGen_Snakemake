@@ -2,7 +2,8 @@ configfile: "config/config.yaml"
 
 rule all:
     input:
-        expand("example_data/repaired/{clade}.fasta", clade=config["clades"])
+        "example_data/nmask.fasta"
+        
 
 def get_clades(wildcards):
     return config["clades"][wildcards.clade]
@@ -15,7 +16,6 @@ rule clustalo_clades:
     threads: 2
     shell:
         "clustalo --thread {threads} -i {input} -o {output}"
-
 
 rule consensus_gen:
     input:
@@ -50,7 +50,8 @@ rule consen_ref_align:
     shell:
         "clustalo --thread {threads} -i {input} -o {output}"
 
-rule repair_ends:
+# Repairs the psuedo_genomes
+rule repair_seq:
     input:
         "example_data/seqref/{clade}.fasta"
     output:
@@ -62,5 +63,36 @@ rule repair_ends:
     script:
         "scripts/repair.py"
     
+# Genrates the bedfiles
+rule bed_gen:
+    input:
+        seq = "example_data/repaired/{clade}.fasta",
+        ref = config["ref_geneome"]
+    output:
+        "example_data/bedfiles/{clade}.bed"
+    conda:
+        "envs/biopython.yaml"
+    script:
+        "scripts/bed_file_gen.py"
+
+# Bed combiner 
+rule bed_combiner:
+    input:
+        expand("example_data/bedfiles/{clade}.bed", clade=config["clades"])
+    output:
+        "example_data/combined.bed"
+    script:
+        "scripts/bed_file_cat.py"
+
+# NMask Gen
+rule nmask_gen:
+    input: 
+        bed = "example_data/combined.bed",
+        ref = config["ref_geneome"]
+    output: 
+        "example_data/nmask.fasta"
+    shell:
+        "bedtools maskfasta -fi {input.ref} -bed {input.bed} -fo {output}"
+
 
 
