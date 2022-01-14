@@ -1,0 +1,9 @@
+clades:
+  clade1: "example_data/sequences/clade1.fasta"
+  clade2: "example_data/sequences/clade2.fasta"
+  clade3: "example_data/sequences/clade3.fasta"
+  clade4: "example_data/sequences/clade4.fasta"
+
+consen_threshold: 0.8
+
+ref_geneome: "example_data/example_ref.fasta"

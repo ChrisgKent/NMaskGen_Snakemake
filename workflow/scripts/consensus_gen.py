@@ -1,14 +1,16 @@
 from Bio import AlignIO
-
 from Bio.Seq import Seq
-from Bio.Seq import MutableSeq
-
 from Bio import SeqIO
-
 from Bio.SeqRecord import SeqRecord
 
 
-def consen_gen2(aligned_path, fasta_seq_name, threshold=0.7, ignore_n=True):
+def main(
+    aligned_path=snakemake.input[0],
+    output=snakemake.output[0],
+    seq_name=snakemake.params["clade"],
+    threshold=snakemake.params["threshold"],
+    ignore_n=True,
+):
     """
     This takes the path to an aligned file and the name you want the consensus sequence to call called.
     Returns a SeqRecord containg the consensus sequence
@@ -84,5 +86,15 @@ def consen_gen2(aligned_path, fasta_seq_name, threshold=0.7, ignore_n=True):
         ):
             returned_base[pos] = "N"
     # The list is joined into a string
-    seq = SeqRecord(Seq("".join(returned_base)), id=fasta_seq_name, description="")
-    return seq
+    seq = SeqRecord(Seq("".join(returned_base)), id=seq_name, description="")
+
+    # Write the output file
+    SeqIO.write(
+        seq,
+        output,
+        "fasta",
+    )
+
+
+if __name__ == "__main__":
+    main()

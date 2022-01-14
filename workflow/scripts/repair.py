@@ -1,5 +1,7 @@
 from Bio import AlignIO
 from Bio.Seq import MutableSeq
+from Bio.SeqRecord import SeqRecord
+from Bio import SeqIO
 
 from itertools import compress
 
@@ -22,7 +24,11 @@ def continous_func(x):
     return dict(zip(x, group_list))
 
 
-def repair(aligned_psuedo_path, pango_lin):
+def main(
+    aligned_psuedo_path=snakemake.input[0],
+    output=snakemake.output[0],
+    seq_name=snakemake.params["seq_name"],
+):
     repair_test = AlignIO.read(aligned_psuedo_path, format="fasta")
     mutable_seq = MutableSeq(repair_test[0].seq)
 
@@ -72,4 +78,14 @@ def repair(aligned_psuedo_path, pango_lin):
         for i in range(mutable_seq.count("*")):
             mutable_seq.remove("*")
 
-    return mutable_seq
+    seq = SeqRecord(mutable_seq, id=seq_name, description="")
+    # Write the output file
+    SeqIO.write(
+        seq,
+        output,
+        "fasta",
+    )
+
+
+if __name__ == "__main__":
+    main()

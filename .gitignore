@@ -1,2 +1,4 @@
 tests/
 output/
+.snakemake/log/
+

@@ -1,0 +1,66 @@
+configfile: "config/config.yaml"
+
+rule all:
+    input:
+        expand("example_data/repaired/{clade}.fasta", clade=config["clades"])
+
+def get_clades(wildcards):
+    return config["clades"][wildcards.clade]
+
+rule clustalo_clades:
+    input:
+        get_clades
+    output:
+        "example_data/msa/{clade}.fasta"
+    threads: 2
+    shell:
+        "clustalo --thread {threads} -i {input} -o {output}"
+
+
+rule consensus_gen:
+    input:
+        "example_data/msa/{clade}.fasta"
+    output:
+        "example_data/consensus/{clade}.fasta"
+    params:
+        clade = "{clade}",
+        threshold = config["consen_threshold"]
+    conda:
+        "envs/biopython.yaml"
+    script:
+        "scripts/consensus_gen.py"
+
+# Combine the consen and the ref
+rule combine_seq_ref:
+    input:
+        seq = "example_data/consensus/{clade}.fasta",
+        ref = config["ref_geneome"]
+    output:
+        "example_data/combined/{clade}.fasta"
+    shell:
+        "cat {input.seq} {input.ref} > {output}"
+
+# Align the consen and the referance
+rule consen_ref_align: 
+    input:
+        "example_data/combined/{clade}.fasta"
+    output:
+        "example_data/seqref/{clade}.fasta"
+    threads: 2
+    shell:
+        "clustalo --thread {threads} -i {input} -o {output}"
+
+rule repair_ends:
+    input:
+        "example_data/seqref/{clade}.fasta"
+    output:
+        "example_data/repaired/{clade}.fasta"
+    params:
+        seq_name = "{clade}"
+    conda:
+        "envs/biopython.yaml"
+    script:
+        "scripts/repair.py"
+    
+
+
