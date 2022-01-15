@@ -7,7 +7,10 @@ output_dir: "results/"
 # The threshold for N masking 
 consen_threshold: 0.8
 
-
+# Threads to asign to clustalO
+## Keep at 1 of using the conda enviroment 
+clustalo_threads:
+  1
 
 # Use conda rather tha mamaba
 use_conda: True
