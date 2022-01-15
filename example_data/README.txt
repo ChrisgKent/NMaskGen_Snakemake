@@ -6,25 +6,7 @@ Input:
 The input sequences need to have a similar directory structure. 
 
 This example was generated with:
-poetry run nmaskgen --output example_data/output --consen_thresh 0.8 example_data/sequences example_data/example_ref.fasta
+$ snakemake --cores all --config output_dir=example_data/results/ input_dir=example_data/sequences
 
---consen_thresh is the value in which the base will be masked with an N. 
-	For example; if 6/7 bases are conserved. The threshold is 0.86, which is greater than 0.8.
-	Hence the position isn't masked.  
-	If two bases are different (either the same or different SNPs), then the threshold of 5/7 (0.71) is less than the threshold and the position is masked.
-
-Output:
-Each variants has its own output containing;
-	x_genomes.fasta: Contains all the input genomes
-	x_pseudoref.bed:	Contains all positions of variation relative to the ref genome
-	x_pseudoref.fasta: Contains the nmasked sequence for this pseudolin
-	tmp/
-	x_pseudo_msa:	Contains all MSA of all the raw genomes
-	x_repair_msa:	Contains the MSA of the consensus genome and the reference
-	x_seqref:	The pre-aligment file with the consensus genome and the reference
-
-base_changes.tsv: 	Shows all the mutations, and the source
-Concat_bed.bed:		The bed file for the nmask
-nmask:			The combined mask	
 
 
