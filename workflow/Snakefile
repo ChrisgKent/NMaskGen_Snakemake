@@ -1,18 +1,36 @@
+import pathlib
+
 configfile: "config/config.yaml"
+
+if 'use_conda' in config and config['use_conda']:
+    workflow.use_conda = True
+
+# Verifiing inputs
+## Make sure the referance path is a file
+if not pathlib.Path(config["ref_dir"]).is_file():
+    raise Exception("There is no file at the Referance genome directory")
+## Input path should point to a directory
+if not pathlib.Path(config["input_dir"]).is_dir():
+    raise Exception("The input does not point to a directory")
+
+
+CLADES = glob_wildcards(pathlib.Path(config["input_dir"])/"{clade}.fasta").clade
+OUTPUT_DIR = pathlib.Path(config["output_dir"])
+REF_DIR = pathlib.Path(config["ref_dir"])
+
 
 rule all:
     input:
-        "example_data/nmask.fasta"
-        
+        OUTPUT_DIR/"nmask.fasta"
 
 def get_clades(wildcards):
-    return config["clades"][wildcards.clade]
+    return CLADES
 
 rule clustalo_clades:
     input:
         get_clades
     output:
-        "example_data/msa/{clade}.fasta"
+        OUTPUT_DIR/"msa/{clade}.fasta"
     threads: 2
     shell:
         "clustalo --thread {threads} -i {input} -o {output}"
@@ -21,7 +39,7 @@ rule consensus_gen:
     input:
         "example_data/msa/{clade}.fasta"
     output:
-        "example_data/consensus/{clade}.fasta"
+        OUTPUT_DIR/"consensus/{clade}.fasta"
     params:
         clade = "{clade}",
         threshold = config["consen_threshold"]
@@ -33,19 +51,19 @@ rule consensus_gen:
 # Combine the consen and the ref
 rule combine_seq_ref:
     input:
-        seq = "example_data/consensus/{clade}.fasta",
-        ref = config["ref_geneome"]
+        seq = OUTPUT_DIR/"consensus/{clade}.fasta",
+        ref = REF_DIR
     output:
-        "example_data/combined/{clade}.fasta"
+        OUTPUT_DIR/"combined/{clade}.fasta"
     shell:
         "cat {input.seq} {input.ref} > {output}"
 
 # Align the consen and the referance
 rule consen_ref_align: 
     input:
-        "example_data/combined/{clade}.fasta"
+        OUTPUT_DIR/"combined/{clade}.fasta"
     output:
-        "example_data/seqref/{clade}.fasta"
+        OUTPUT_DIR/"seqref/{clade}.fasta"
     threads: 2
     shell:
         "clustalo --thread {threads} -i {input} -o {output}"
@@ -53,9 +71,9 @@ rule consen_ref_align:
 # Repairs the psuedo_genomes
 rule repair_seq:
     input:
-        "example_data/seqref/{clade}.fasta"
+        OUTPUT_DIR/"seqref/{clade}.fasta"
     output:
-        "example_data/repaired/{clade}.fasta"
+        OUTPUT_DIR/"repaired/{clade}.fasta"
     params:
         seq_name = "{clade}"
     conda:
@@ -66,10 +84,10 @@ rule repair_seq:
 # Genrates the bedfiles
 rule bed_gen:
     input:
-        seq = "example_data/repaired/{clade}.fasta",
-        ref = config["ref_geneome"]
+        seq = OUTPUT_DIR/"repaired/{clade}.fasta",
+        ref = REF_DIR
     output:
-        "example_data/bedfiles/{clade}.bed"
+        OUTPUT_DIR/"bedfiles/{clade}.bed"
     conda:
         "envs/biopython.yaml"
     script:
@@ -78,21 +96,23 @@ rule bed_gen:
 # Bed combiner 
 rule bed_combiner:
     input:
-        expand("example_data/bedfiles/{clade}.bed", clade=config["clades"])
+        expand(OUTPUT_DIR/"bedfiles/{clade}.bed", clade=CLADES)
     output:
-        "example_data/combined.bed"
+        OUTPUT_DIR/"combined.bed"
     script:
         "scripts/bed_file_cat.py"
 
 # NMask Gen
 rule nmask_gen:
     input: 
-        bed = "example_data/combined.bed",
-        ref = config["ref_geneome"]
+        bed_dir = OUTPUT_DIR/"combined.bed",
+        ref_dir = REF_DIR
     output: 
-        "example_data/nmask.fasta"
-    shell:
-        "bedtools maskfasta -fi {input.ref} -bed {input.bed} -fo {output}"
+        OUTPUT_DIR/"nmask.fasta"
+    conda:
+        "envs/biopython.yaml"
+    script:
+        "scripts/mask_gen.py"
 
 
 
