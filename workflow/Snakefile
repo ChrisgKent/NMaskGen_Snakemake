@@ -1,5 +1,11 @@
 import pathlib
 
+# TODO add some better thread managment 
+#   Profile code
+#   Unit testing 
+#   Optomisation
+#   Single conda enviroment 
+
 configfile: "config/config.yaml"
 
 if 'use_conda' in config and config['use_conda']:
@@ -28,23 +34,21 @@ def get_clades(wildcards):
 
 rule clustalo_clades:
     input:
-        get_clades
+        pathlib.Path(config["input_dir"])/"{clade}.fasta" 
     output:
         OUTPUT_DIR/"msa/{clade}.fasta"
-    threads: 2
+    threads: config["clustalo_threads"]
     shell:
         "clustalo --thread {threads} -i {input} -o {output}"
 
 rule consensus_gen:
     input:
-        "example_data/msa/{clade}.fasta"
+        OUTPUT_DIR/"msa/{clade}.fasta"
     output:
         OUTPUT_DIR/"consensus/{clade}.fasta"
     params:
         clade = "{clade}",
         threshold = config["consen_threshold"]
-    conda:
-        "envs/biopython.yaml"
     script:
         "scripts/consensus_gen.py"
 
@@ -64,7 +68,7 @@ rule consen_ref_align:
         OUTPUT_DIR/"combined/{clade}.fasta"
     output:
         OUTPUT_DIR/"seqref/{clade}.fasta"
-    threads: 2
+    threads: config["clustalo_threads"]
     shell:
         "clustalo --thread {threads} -i {input} -o {output}"
 
@@ -76,8 +80,6 @@ rule repair_seq:
         OUTPUT_DIR/"repaired/{clade}.fasta"
     params:
         seq_name = "{clade}"
-    conda:
-        "envs/biopython.yaml"
     script:
         "scripts/repair.py"
     
@@ -88,8 +90,6 @@ rule bed_gen:
         ref = REF_DIR
     output:
         OUTPUT_DIR/"bedfiles/{clade}.bed"
-    conda:
-        "envs/biopython.yaml"
     script:
         "scripts/bed_file_gen.py"
 
@@ -109,8 +109,6 @@ rule nmask_gen:
         ref_dir = REF_DIR
     output: 
         OUTPUT_DIR/"nmask.fasta"
-    conda:
-        "envs/biopython.yaml"
     script:
         "scripts/mask_gen.py"
 
