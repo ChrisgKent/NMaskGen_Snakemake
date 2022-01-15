@@ -1,9 +1,13 @@
-clades:
-  clade1: "example_data/sequences/clade1.fasta"
-  clade2: "example_data/sequences/clade2.fasta"
-  clade3: "example_data/sequences/clade3.fasta"
-  clade4: "example_data/sequences/clade4.fasta"
-
+# The input directory containing all sequence files
+input_dir: "example_data/sequences"
+# The referance genome location
+ref_dir: "example_data/example_ref.fasta"
+# Output directory
+output_dir: "results/"
+# The threshold for N masking 
 consen_threshold: 0.8
 
-ref_geneome: "example_data/example_ref.fasta"
+
+
+# Use conda rather tha mamaba
+use_conda: True
