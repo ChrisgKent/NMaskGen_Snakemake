@@ -19,22 +19,33 @@ if not pathlib.Path(config["ref_dir"]).is_file():
 if not pathlib.Path(config["input_dir"]).is_dir():
     raise Exception("The input does not point to a directory")
 
+CLADES = glob_wildcards(pathlib.Path(config["input_dir"])/"{clade}/{sample}.fasta").clade
+CLADES = list(set(CLADES))
 
-CLADES = glob_wildcards(pathlib.Path(config["input_dir"])/"{clade}.fasta").clade
+# This input function finds all subseqs within each clade
+## and returns them as a list 
+def CLADES_SUBSEQ(wildcards):
+    path = pathlib.Path(config["input_dir"])/wildcards.clade
+    return [x for x in path.iterdir() if x.suffix == ".fasta"]
+
 OUTPUT_DIR = pathlib.Path(config["output_dir"])
 REF_DIR = pathlib.Path(config["ref_dir"])
-
 
 rule all:
     input:
         OUTPUT_DIR/"nmask.fasta"
 
-def get_clades(wildcards):
-    return CLADES
+rule seq_combine:
+    input:
+        CLADES_SUBSEQ
+    output:
+        OUTPUT_DIR/"cat_seqs/{clade}.fasta"
+    shell:
+        "cat {input} > {output}"
 
 rule clustalo_clades:
     input:
-        pathlib.Path(config["input_dir"])/"{clade}.fasta" 
+        OUTPUT_DIR/"cat_seqs/{clade}.fasta"
     output:
         OUTPUT_DIR/"msa/{clade}.fasta"
     threads: config["clustalo_threads"]
