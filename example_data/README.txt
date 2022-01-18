@@ -6,7 +6,8 @@ Input:
 The input sequences need to have a similar directory structure. 
 
 This example was generated with:
-$ snakemake --cores all --config output_dir=example_data/results/ input_dir=example_data/sequences
-
+```
+snakemake --cores all --config output_dir=example_data/results/ input_dir=example_data/sequences
+```
 
 
