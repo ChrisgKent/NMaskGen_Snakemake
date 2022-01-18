@@ -12,9 +12,10 @@ conda activate nmaskgen
 Running nmaskgen
 ```
 snakemake --cores all --config input_dir={input} 
-
-# The example data:
-snakemake --cores all --config output_dir=example_data/new_results/ input_dir=example_data/sequences
-
-The new_results can be verifed agaisnt results
 ```
+The example data
+```
+snakemake --cores all --config output_dir=example_data/new_results/ input_dir=example_data/sequences
+```
+The new_results can be verifed agaisnt results
+
