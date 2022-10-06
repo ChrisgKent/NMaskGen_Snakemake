@@ -11,7 +11,7 @@ conda activate nmaskgen
 ```
 Running nmaskgen
 ```
-snakemake --cores all --confiinput_dir={input} 
+snakemake --cores all --config input_dir={input} 
 ```
 The example data
 ```
